@@ -12,52 +12,47 @@ const Redis = () => {
     content: "Hello"
   });
   const [contents, setContents] = useState([]);
-
-  //입력 양식 값이 변경될 때 상태 변경
+  
   const changeSubTopic = (event) => {
     setSubTopic(event.target.value);
   };
 
   const changePubMessage = (event) => {
-    setPubMessage({...pubMessage, [event.target.name]:event.target.value});
+    setPubMessage({
+      ...pubMessage,
+      [event.target.name]: event.target.value
+    });
   };
-
-  //상태 변경 내용 출력
-  useEffect(() => {
-    console.group("상태 변경");
-      console.log("connected: ", connected);
-      console.log("subTopic: ", subTopic);
-      console.log("pubMessage: ", pubMessage);
-      console.log("contents: ", contents);
-    console.groupEnd();
-  }); 
 
   //-------------------------------------------------------------
   //버튼 이벤트 처리
   //-------------------------------------------------------------
+  // 렌더링 상관 없이 변수를 유지하기 위해 --> DOM 참조
+  // 컴포넌트가 갱신 되더라도 다시 초기화되지 않는 변수로 생성
   let ws = useRef(null);
   const connectWebSocket = () => {
+    // 자동 연결하려면 useEffect()에 작성
     ws.current = new WebSocket("ws://localhost:8080/websocket/redis");
-
+    // 접속 연결 시 자동 실행
     ws.current.onopen = () => {
       console.log("접속 성공");
       setConnected(true);
+
+      // 접속 시 자동 수신 설정되도록
       sendSubTopic();
     };
-    
+
     ws.current.onclose = () => {
       console.log("접속 끊김");
       setConnected(false);
     };
-    
+
     ws.current.onmessage = (event) => {
       console.log("메시지 수신");
-      var strJson = event.data;
-      var message = JSON.parse(strJson);
-      setContents((contents) => {
-        return contents.concat(message.topic + ": " + message.content);
-      });
-    } 
+      var json = event.data;
+      var message = JSON.parse(json);   //JS 객체로 만듦 {topic:xxx, content:yyy}
+      setContents((contents) => contents.concat(message.topic + ": " + message.content));    //성능향상을 위해 함수 사용
+    };
   };
 
   const disconnectWebSocket = () => {
@@ -65,21 +60,23 @@ const Redis = () => {
   };
 
   const sendSubTopic = () => {
-    var json = {topic:subTopic};		
-    var strJson = JSON.stringify(json);
-    ws.current.send(strJson);
-  }
+    var json = {topic: subTopic};
+    var message = JSON.stringify(json);
+    ws.current.send(message);
+  };
 
-  const publishTopic = async () => {
+  const publishTopic = async() => {
     await sendRedisMessage(pubMessage);
-  } 
+  };
 
   //-------------------------------------------------------------
   //마운트 및 언마운트에 실행할 내용
   //-------------------------------------------------------------
   useEffect(() => {
+    // 마운트 시 실행
     connectWebSocket();
     return (() => {
+      // 언마운트 시 실행
       disconnectWebSocket();
     });
   }, []);
@@ -95,7 +92,7 @@ const Redis = () => {
       <div className="card-body">
 
         <div>
-          {connected === false?
+          {connected === false ?
             <button className="btn btn-info btn-sm" onClick={connectWebSocket}>웹소켓 접속하기</button>
             :
             <button className="btn btn-info btn-sm" onClick={disconnectWebSocket}>웹소켓 접속끊기</button>
